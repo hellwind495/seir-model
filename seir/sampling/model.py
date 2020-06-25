@@ -492,7 +492,7 @@ class SamplingNInfectiousModel:
             d_tot = np.sum(d_tot, axis=2, keepdims=True)
 
         # take diff if fitting to new death cases instead of cumulative
-        if fit_new_deaths:
+        if fit_new_deaths and deaths_obs is not None:
             d_tot = np.diff(d_tot, axis=0)
             deaths_obs = np.diff(deaths_obs, axis=0)
 

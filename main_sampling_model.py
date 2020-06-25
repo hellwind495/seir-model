@@ -341,9 +341,10 @@ def build_and_solve_model(t_obs,
             # these are calculated from WC data, where the proportions are found from patients with known outcomes
             # TODO: Change beta distributions to dirichlet distributions
             mort_loading = _uniform_from_range(args.mort_loading_range, size=(nb_samples, 1))
-            prop_h_to_c = 6/119  # np.array([[1 / 81, 1 / 81, 1 / 81, 7 / 184, 32 / 200, 38 / 193, 24 / 129, 10 / 88, 5 / 31]])
-            prop_h_to_d = mort_loading * np.array([[0.011, 0.042, 0.045, 0.063, 0.096, 0.245, 0.408, 0.448, 0.526]])
-            prop_c_to_d = mort_loading * np.array([[0.011, 0.042, 0.410, 0.540, 0.590, 0.650, 0.660, 0.670, .710]])
+            prop_s_to_h = np.array([[0.96, 0.96, 0.96, 0.96, 0.95, 0.90, 0.80, 0.80, 0.80]])
+            prop_h_to_c = 6/1238  # np.array([[1 / 81, 1 / 81, 1 / 81, 7 / 184, 32 / 200, 38 / 193, 24 / 129, 10 / 88, 5 / 31]])
+            prop_h_to_d = mort_loading * np.array([[0.0033, 0.0033, 0.0042, 0.0042, 0.0064, 0.0142, 0.0636, 0.2078, 0.4551]])
+            prop_c_to_d = mort_loading * np.array([[0.60, 0.60, 0.75, 0.75, 0.729, 0.723, 0.726, 0.729, 0.721]])
     else:
         # load df
         logging.info(f"Loading proportion priors from {load_prior_file}")
@@ -396,7 +397,7 @@ def build_and_solve_model(t_obs,
         if 'prop_s_to_h' in df_priors:
             prop_s_to_h = load_and_randomise('prop_s_to_h').clip(min=0, max=1)
         else:
-            prop_s_to_h = _uniform_from_range(args.prop_s_to_h, size=(nb_samples, 1))
+            prop_s_to_h = np.array([[0.96, 0.96, 0.96, 0.96, 0.95, 0.90, 0.80, 0.80, 0.80]])
         beta = load_and_randomise('beta').clip(min=0)
         rel_lockdown5_beta = load_and_randomise('rel_lockdown5_beta').clip(min=0, max=1)
         rel_lockdown4_beta = load_and_randomise('rel_lockdown4_beta').clip(min=rel_lockdown5_beta-0.05, max=1)
@@ -411,7 +412,7 @@ def build_and_solve_model(t_obs,
         prop_c_to_d = load_and_randomise('prop_c_to_d').clip(min=0, max=1)
         e0 = load_and_randomise('e0').clip(min=1e-20)
 
-        mort_loading = prop_h_to_d / np.array([[0.011, 0.042, 0.045, 0.063, 0.096, 0.245, 0.408, 0.448, 0.526]])
+        mort_loading = prop_h_to_d / np.array([[0.0033, 0.0033, 0.0042, 0.0042, 0.0064, 0.0142, 0.0636, 0.2078, 0.4551]])
         mort_loading = mort_loading[:, 0:1]
 
     y0, e0 = create_y0(args, nb_samples, nb_groups, e0=e0)
