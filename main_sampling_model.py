@@ -43,10 +43,19 @@ parser.add_argument('--r0_range', type=float, default=[1.5, 3.5], nargs=2,
 parser.add_argument('--rel_beta_as_range', type=float, default=[0.3, 1], nargs=2,
                     help='Lower and upper bounds to for the uniform prior distribution of the relative infectivity '
                          'level of asymptomatic cases.')
-parser.add_argument('--rel_lockdown5_beta_range', type=float, default=[0.4, 1], nargs=2,
+parser.add_argument('--rel_lockdown5_beta_range', type=float, default=[0.4, 0.9], nargs=2,
                     help='Lower and upper bounds for the uniform prior distribution of the relative beta '
                          'experience during level 5 lockdown.')
-parser.add_argument('--rel_postlockdown_beta', type=float, default=0.8,
+parser.add_argument('--rel_lockdown4_beta_range', type=float, default=[0.4, 0.9], nargs=2,
+                    help='Lower and upper bounds for the uniform prior distribution of the relative beta '
+                         'experience during level 4 lockdown.')
+parser.add_argument('--rel_lockdown3_beta_range', type=float, default=[0.4, 0.8], nargs=2,
+                    help='Lower and upper bounds for the uniform prior distribution of the relative beta '
+                         'experience during level 3 lockdown.')
+parser.add_argument('--rel_lockdown2_beta_range', type=float, default=[0.4, 0.8], nargs=2,
+                    help='Lower and upper bounds for the uniform prior distribution of the relative beta '
+                         'experience during level 2 lockdown.')
+parser.add_argument('--rel_postlockdown_beta_range', type=float, default=[0.8, 0.8], nargs=2,
                     help='The relative infectivity post all levels of lockdown.')
 
 parser.add_argument('--prop_as_range', type=float, default=[0.5, 0.5], nargs=2,
@@ -264,8 +273,8 @@ def process_multi_run(nb_runs, nb_resamples, output_dir, model_name, args):
 
     resample_vars['e0'] = e0
 
-    plot_prior_posterior(model_base, full_samples, resample_vars,
-                         model.calculated_sample_vars, model.calculated_resample_vars)
+    # plot_prior_posterior(model_base, full_samples, resample_vars,
+    #                      model.calculated_sample_vars, model.calculated_resample_vars)
 
 
 def build_and_solve_model(t_obs,
@@ -299,7 +308,6 @@ def build_and_solve_model(t_obs,
         nb_groups = 1
     nb_samples = args.nb_samples
     ratio_resample = args.ratio_resample
-    rel_postlockdown_beta = args.rel_postlockdown_beta
     contact_heterogeneous = args.contact_heterogeneous
     contact_k = args.contact_k
 
@@ -319,11 +327,11 @@ def build_and_solve_model(t_obs,
         r0 = _uniform_from_range(args.r0_range, size=(nb_samples, 1))
         beta = r0 / time_infectious
         rel_lockdown5_beta = _uniform_from_range(args.rel_lockdown5_beta_range, size=(nb_samples, 1))
-        rel_lockdown4_beta = np.random.uniform(rel_lockdown5_beta - 0.05, (rel_lockdown5_beta+0.2).clip(max=1), size=(nb_samples, 1))
-        rel_lockdown3_beta = np.random.uniform(rel_lockdown4_beta - 0.05, (rel_lockdown4_beta+0.2).clip(max=0.9), size=(nb_samples, 1))
-        rel_lockdown2_beta = np.random.uniform(rel_lockdown3_beta - 0.05, (rel_lockdown3_beta+0.2).clip(max=0.8), size=(nb_samples, 1))
-        rel_postlockdown_beta = np.random.uniform(rel_lockdown2_beta - 0.01, (rel_lockdown2_beta+0.1), size=(nb_samples, 1))
-        rel_beta_as = np.random.uniform(0.3, 1, size=(nb_samples, 1))
+        rel_lockdown4_beta = _uniform_from_range(args.rel_lockdown4_beta_range, size=(nb_samples, 1))
+        rel_lockdown3_beta = _uniform_from_range(args.rel_lockdown3_beta_range, size=(nb_samples, 1))
+        rel_lockdown2_beta = _uniform_from_range(args.rel_lockdown2_beta_range, size=(nb_samples, 1))
+        rel_postlockdown_beta = _uniform_from_range(args.rel_postlockdown_beta_range, size=(nb_samples, 1))
+        rel_beta_as = _uniform_from_range(args.rel_beta_as_range, size=(nb_samples, 1))
 
         e0 = _uniform_from_range(args.e0_range, size=(nb_samples, 1))
 
@@ -474,14 +482,14 @@ def build_and_solve_model(t_obs,
     calc_resample_vars = model.calculated_resample_vars
 
     sample_vars['e0'] = e0
-    e0_resample = e0[model.resample_indices]  # TODO: Make y0 resampling a thing
+    # e0_resample = e0[model.resample_indices]  # TODO: Make y0 resampling a thing
 
-    resample_vars['e0'] = e0_resample
+    # resample_vars['e0'] = e0_resample
     scalar_vars['t0'] = t0
 
     # hack mort loading into plot
-    calc_sample_vars['mort_loading'] = mort_loading
-    calc_resample_vars['mort_loading'] = mort_loading[model.resample_indices]
+    # calc_sample_vars['mort_loading'] = mort_loading
+    # calc_resample_vars['mort_loading'] = mort_loading[model.resample_indices]
 
     # save model variables
     save_model_variables(model, base=model_base)
@@ -493,19 +501,19 @@ def build_and_solve_model(t_obs,
             df_resample[f'{key}_{i}'] = value[:, i]
 
     # plot variables of interest
-    plot_prior_posterior(model_base, sample_vars, resample_vars, calc_sample_vars, calc_resample_vars)
+    # plot_prior_posterior(model_base, sample_vars, resample_vars, calc_sample_vars, calc_resample_vars)
 
-    if len(df_resample.columns) <= 20:
-        logging.info('Building joint distribution plot')
-        g = sns.PairGrid(df_resample, corner=True)
-        try:
-            g = g.map_lower(sns.kdeplot, colors='C0')
-            g = g.map_diag(sns.distplot)
-        except np.linalg.LinAlgError:
-            logging.warning(f'Plotting of joint distribution failed due to posterior collapse')
-        g.savefig(f'{model_base}_joint_posterior.png')
-        plt.clf()
-        del g
+    # if len(df_resample.columns) <= 20:
+    #     logging.info('Building joint distribution plot')
+    #     g = sns.PairGrid(df_resample, corner=True)
+    #     try:
+    #         g = g.map_lower(sns.kdeplot, colors='C0')
+    #         g = g.map_diag(sns.distplot)
+    #     except np.linalg.LinAlgError:
+    #         logging.warning(f'Plotting of joint distribution failed due to posterior collapse')
+    #     g.savefig(f'{model_base}_joint_posterior.png')
+    #     plt.clf()
+    #     del g
 
     del model
 
@@ -557,6 +565,8 @@ def plot_prior_posterior(model_base, sample_vars, resample_vars, calc_sample_var
 
 
 def create_y0(args, nb_samples=1, nb_groups=1, e0=None):
+    if nb_samples is None:
+        nb_samples = 1
     if e0 is None:
         e0 = np.random.uniform(0, 1e-5, size=(nb_samples, 1))
     y0 = np.zeros((nb_samples, nb_groups, SamplingNInfectiousModel.nb_states))
@@ -824,6 +834,8 @@ def calculate_resample(t_obs,
 
     t0 = scalar_vars.pop('t0')
     e0 = resample_vars.pop('e0', None)
+    if args.nb_samples == 1:
+        e0 = _uniform_from_range(args.e0_range, size=(args.nb_samples, 1))
 
     y0, e0 = create_y0(args, nb_samples, nb_groups, e0=e0)
 
