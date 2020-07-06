@@ -610,8 +610,12 @@ def create_y0(args, nb_samples=1, nb_groups=1, e0=None):
             df_pop['Western Cape'] = df_pop['Western Cape'] * 7000000 / df_pop[
                 'Western Cape'].sum()  # adjust to Andrew's 7m for now
         for i in range(nb_groups):
-            y0[:, i, 0] = (1 - e0[:, 0]) * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
-            y0[:, i, 1] = e0[:, 0] * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
+            if isinstance(e0, np.ndarray):
+                y0[:, i, 0] = (1 - e0[:, 0]) * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
+                y0[:, i, 1] = e0[:, 0] * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
+            else:
+                y0[:, i, 0] = (1 - e0) * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
+                y0[:, i, 1] = e0 * df_pop[filter][df_pop['idx'] == i].values[0] * (1 - args.prop_immune)
     y0 = y0.reshape(-1)
     return y0, e0
 
