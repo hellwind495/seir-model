@@ -345,7 +345,8 @@ def build_and_solve_model(t_obs,
         else:
             logging.info('Using 9 age groups, corresponding to 10 year age bands.')
             # from ferguson
-            prop_m = (1 - prop_a) * np.array([[0.999, 0.997, 0.988, 0.968, 0.951, 0.898, 0.834, 0.757, 0.727]])
+            prop_s_base = np.array([[0.005, 0.0025, 0.0167, 0.0317, 0.0501, 0.0768, 0.0927, 0.1236, 0.1637]])
+            prop_m = (1 - prop_a) * (1 - prop_s_base)
             # inform variables from the WC experience, controlling for age
             # these are calculated from WC data, where the proportions are found from patients with known outcomes
             # TODO: Change beta distributions to dirichlet distributions
