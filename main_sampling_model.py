@@ -694,7 +694,7 @@ def load_data_WC(remove_small: bool = True):
     # the WC reporting has some lag, so choose a date to set as the maximum date for each of the dfs
     max_date = np.min([df_deaths['date'].max(), df_confirmed['date'].max(), df_hosp_icu['date'].max()])
     max_date = max_date - datetime.timedelta(days=5)  # max date set as 5 days prior to shared maximum date
-    min_date = max_date - datetime.timedelta(days=45) # min date set to 30 days prior the maximum date, to remove noise
+    min_date = max_date - datetime.timedelta(days=80) # min date set to 80 days prior the maximum date
 
     # filter maximum date
     df_deaths = df_deaths[df_deaths['date'] <= max_date]
