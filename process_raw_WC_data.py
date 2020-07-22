@@ -26,7 +26,7 @@ from scipy.optimize import curve_fit
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, default='../Western Cape/',
                     help='Folder where the data is stored')
-parser.add_argument('--data_date', type=str, default='2020/07/15',
+parser.add_argument('--data_date', type=str, default='2020/07/20',
                     help='Date on which data was extracted')
 parser.add_argument('--age_groups', action='store_true')
 
@@ -91,16 +91,16 @@ def main():
     logging.info('Calculating...')
     for date in date_range:
         df_hosp_current = df_WC.apply(current_hospital_patient, axis=1, date=date)
-        df_hosp_current_excl_discharge = df_WC.apply(current_hospital_patient_excl_discharge_date, axis=1, date=date)
+        #df_hosp_current_excl_discharge = df_WC.apply(current_hospital_patient_excl_discharge_date, axis=1, date=date)
         df_icu_current = df_WC.apply(current_icu_patient, axis=1, date=date)
-        df_icu_current_excl_discharge = df_WC.apply(current_icu_patient_excl_discharge_date, axis=1, date=date)
+        #df_icu_current_excl_discharge = df_WC.apply(current_icu_patient_excl_discharge_date, axis=1, date=date)
         df_deaths = df_WC.apply(current_deaths, axis=1, date=date)
         df_recoveries = df_WC.apply(current_recoveries, axis=1, date=date)
 
         df_out.loc[df_out['date'] == date, 'Current Hospitalisations'] = df_hosp_current.sum()
         df_out.loc[df_out['date'] == date, 'Current ICU'] = df_icu_current.sum()
-        df_out.loc[df_out['date'] == date, 'Current Hospitalisations excl discharge date'] = df_hosp_current_excl_discharge.sum()
-        df_out.loc[df_out['date'] == date, 'Current ICU excl discharge date'] = df_icu_current_excl_discharge.sum()        
+        #df_out.loc[df_out['date'] == date, 'Current Hospitalisations excl discharge date'] = df_hosp_current_excl_discharge.sum()
+        #df_out.loc[df_out['date'] == date, 'Current ICU excl discharge date'] = df_icu_current_excl_discharge.sum()        
         df_out.loc[df_out['date'] == date, 'Cum Deaths'] = df_deaths.sum()
         df_out.loc[df_out['date'] == date, 'Cum Recoveries'] = df_recoveries.sum()
 
@@ -115,6 +115,18 @@ def main():
     calib = pd.read_csv(data_path + 'Covid-19 calibration data ' + data_date_str + '.csv'
                     ,parse_dates=['date'],date_parser=lambda x:pd.to_datetime(x,format='%d %m %Y'))
 
+    # save version for use in calibrations
+    calib_out = calib[['date','current_general','current_ICU','cum_death']].copy()
+    calib_out.rename(columns = {'current_general':'Current Hospitalisations',
+                                'current_ICU':'Current ICU',
+                                'cum_death':'Cum Deaths'},inplace=True)
+    save_path = Path(args.data_path + 'WC_data_calib_' + data_date_str + '.csv')
+    logging.info(f"Saving calibration data to '{save_path}'")
+    calib_out.to_csv(save_path, index=False)
+    save_path = Path('data/WC_data.csv')
+    logging.info(f"Saving calibration data to '{save_path}'")
+    calib_out.to_csv(save_path, index=False)
+
     # filter out before earliest common date
     min_date = max(df_out['date'].min(),calib['date'].min())
     df_out = df_out[df_out['date'] >= min_date]
@@ -123,13 +135,13 @@ def main():
     fig, ax = plt.subplots(1,2,figsize=(20,5))
 
     ax[0].plot(df_out['date'],df_out['Current Hospitalisations'],label='Derived from line data')
-    ax[0].plot(df_out['date'],df_out['Current Hospitalisations excl discharge date'],label='Derived, discharge date excluded')
+    #ax[0].plot(df_out['date'],df_out['Current Hospitalisations excl discharge date'],label='Derived, discharge date excluded')
     ax[0].plot(calib['date'],calib['current_general'],label='Calibration data')
     ax[0].legend()
     ax[0].xaxis.set_major_locator(mdates.MonthLocator())
 
     ax[1].plot(df_out['date'],df_out['Current ICU'],label='Derived from line data')
-    ax[1].plot(df_out['date'],df_out['Current ICU excl discharge date'],label='Derived, discharge date excluded')
+    #ax[1].plot(df_out['date'],df_out['Current ICU excl discharge date'],label='Derived, discharge date excluded')
     ax[1].plot(calib['date'],calib['current_ICU'],label='Calibration data')
     ax[1].legend()
     ax[1].xaxis.set_major_locator(mdates.MonthLocator())
@@ -144,6 +156,9 @@ def main():
     # Kaplan-Meier survival analysis #
     ##################################
 
+    # make discharge date eqal to date of death if former null and latter populated
+    df_WC['Discharge_date'] = df_WC.apply(fill_discharge_date_for_deaths,axis=1)
+
     if args.age_groups:
         print('Doing KM estimate for multiple age groups')
         age_groups = [['0 - 5', '5 - 10'], ['10 - 15', '15 - 20'], ['20 - 25', '25 - 30'], ['30 - 35', '35 - 40'],
@@ -157,7 +172,7 @@ def main():
                 filter = (filter) | (df_WC['agegroup'] == group[i])
             km_estimate(df_WC[filter].reset_index(), fig_path=f'{data_path}KM_estimates_{suffix}.png', csv_path=f'{data_path}durations_{suffix}.csv')
     else:
-        km_estimate(df_WC, fig_path=f'{data_path}KM_estimates_allages.png', csv_path=f'{data_path}durations_allages.csv')
+        km_estimate(df_WC, fig_path=f'{data_path}KM_estimates_all_ages.png', csv_path=f'{data_path}durations_all_ages.csv')
 
 
     ######################
@@ -363,15 +378,7 @@ def filter_covid_hospital_cases(row):  # note 21-day post-discharge diagnosis ru
 
 def current_hospital_patient(row, date):
     hospital_case = False
-    if row['Admission_date'] <= date and (row['Discharge_date'] >= date or pd.isna(row['Discharge_date'])):
-        # have a valid inpatient for this date, check if they are in hospital or in ICU
-        if row['admitted_to_icu'] == 'No' or date <= row['Date_of_ICU_admission']:
-            hospital_case = True
-    return hospital_case
-
-def current_hospital_patient_excl_discharge_date(row, date):
-    hospital_case = False
-    if row['Admission_date'] <= date and (row['Discharge_date'] > date or pd.isna(row['Discharge_date'])):
+    if row['Admission_date'] <= date and (row['Discharge_date'] >= date or pd.isna(row['Discharge_date'])) and (row['date_of_death'] >= date or pd.isna(row['date_of_death'])):
         # have a valid inpatient for this date, check if they are in hospital or in ICU
         if row['admitted_to_icu'] == 'No' or date <= row['Date_of_ICU_admission']:
             hospital_case = True
@@ -393,15 +400,7 @@ def admitted_to_icu(row):
 
 def current_icu_patient(row, date):
     icu_case = False
-    if row['Admission_date'] <= date and (row['Discharge_date'] >= date or pd.isna(row['Discharge_date'])):
-        # have a valid inpatient for this date, check if they are in hospital or in ICU
-        if row['admitted_to_icu'] == 'Yes' and date >= row['Date_of_ICU_admission']:
-            icu_case = True
-    return icu_case
-
-def current_icu_patient_excl_discharge_date(row, date):
-    icu_case = False
-    if row['Admission_date'] <= date and (row['Discharge_date'] > date or pd.isna(row['Discharge_date'])):
+    if row['Admission_date'] <= date and (row['Discharge_date'] >= date or pd.isna(row['Discharge_date'])) and (row['date_of_death'] >= date or pd.isna(row['date_of_death'])):
         # have a valid inpatient for this date, check if they are in hospital or in ICU
         if row['admitted_to_icu'] == 'Yes' and date >= row['Date_of_ICU_admission']:
             icu_case = True
@@ -639,6 +638,12 @@ def km_estimate(df,fig_path,csv_path):
     plt.tight_layout()
     fig.savefig(fig_path)
 
+
+def fill_discharge_date_for_deaths(row):
+    if ~pd.isna(row['date_of_death']):
+        if pd.isna(row['Discharge_date']):
+            return(row['date_of_death'])
+    return(row['Discharge_date'])
 
 if __name__ == '__main__':
     main()
